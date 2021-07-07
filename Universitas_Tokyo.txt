@@ -2951,7 +2951,7 @@ void tampil(void)
     glBegin(GL_QUADS);
     glColor3f(0.8f, 0.5f, 0.0f);
     //papanbase
-    kotak(5, 9, -80, 25, 22, -79.5);
+    kotak(5, 9, -79, 25, 22, -79.5);
     glColor3f(1.1f, 1.0f, 1.0f);
     //boarddepan
     kotak(6, 11, -79.5, 24, 20, -79);
