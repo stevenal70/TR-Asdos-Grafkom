@@ -1,33 +1,66 @@
+tr grafkom asdos
+
+/*
+ * GLUT Shapes Demo
+ *
+ * Written by Nigel Stewart November 2003
+ *
+ * This program is test harness for the sphere, cone
+ * and torus shapes in GLUT.
+ *
+ * Spinning wireframe and smooth shaded shapes are
+ * displayed until the ESC or q key is pressed.  The
+ * number of geometry stacks and slices can be adjusted
+ * using the + and - keys.
+ */
+
+
+
 #include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <GL/glut.h>
 #include <math.h>
 #define PI 3.14
+#define FPS 120
+#define TO_RADIANS 3.14/180.0
 
-int n;
+
+GLUquadricObj *quadratic;
+const int width = 1280;
+const int height = 720;
+int i,n;
 int is_depth;
+double x_geser, y_geser, z_geser;
 
-float xrot = 0.0f;
-float yrot = 0.0f;
-float xdiff = 0.0f;
-float ydiff = 0.0f;
-bool mouseDown = false;
+float pitch = 0.0, yaw = 0.0;
+float camX = 0.0, camZ = 0.0, terbang = 25.0;
 
-float xmov = 0.0f;
-float ymov = 0.0f;
-float zmov = 0.0f;
+
+void display();
+void reshape(int w, int h);
+void timer(int);
+void passive_motion(int, int);
+void camera();
+void keyboard(unsigned char key, int x, int y);
+void keyboard_up(unsigned char key, int x, int y);
+
+
+struct Motion
+{
+	bool Forward, Backward, Left, Right, Naik, Turun;
+};
+Motion motion = { false,false,false,false,false,false };
 
 void init(void)
 {
     glClearColor(1.0, 1.0, 1.0, 1.0);
-    glEnable(GL_DEPTH_TEST);
-    is_depth = 1;
-    glMatrixMode(GL_MODELVIEW);
-    glEnable(GL_LIGHTING);
-    glEnable(GL_COLOR_MATERIAL);
-    glEnable(GL_LIGHT0);
-    glEnable(GL_DEPTH_TEST);
+    glutSetCursor(GLUT_CURSOR_NONE);
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDepthFunc(GL_LEQUAL);
+	glutWarpPointer(width / 2, height / 2);
 }
 
 void angkajam(float jarak, float x, float y, float z) {
@@ -2854,13 +2887,7 @@ void tampil(void)
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
-    gluLookAt(0.0f, 0.0f, 3.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-
-    glRotatef(xrot, 1.0f, 0.0f, 0.0f);
-    glRotatef(yrot, 0.0f, 1.0f, 0.0f);
-
-    glTranslatef(xmov, ymov, zmov);
-
+    camera();
     glPushMatrix();
 
     bangunan1();
@@ -2932,129 +2959,214 @@ void tampil(void)
     glEnd();
     glPopMatrix();
 
+    glPushMatrix();//jam dinding
+	glTranslated(0,75,23);
+	glRotated(0, -1, 0, 0);
+	glColor3f(0,0,0);
+    quadratic = gluNewQuadric();
+    gluCylinder(quadratic,5.1,5.1,2.2,32,32);
+	glPopMatrix();
+
     glPushMatrix();
-    jam(0, 75, 23, 5, 500);
-    angkajam(4.4, 0, 75, 5.3);
+    jam(0, 75, 25,5.98, 500);
+    angkajam(4.4, 0, 75, 5.7);
     glEnd();
     glPopMatrix();
 
+    glPushMatrix();
+    glBegin(GL_QUADS);
+    glTranslated(0,75,27);
+     glColor3f(0,0,0);
+    //sudutmenit
+    kotak(-0.3, 75, 25, 0.08, 72,25.3);
+    glEnd();
+    glPopMatrix();
 
+    glPushMatrix();
+    glBegin(GL_QUADS);
+    glTranslated(0.8,75,27);
+     glColor3f(0,0,0);
+    //sudutjam
+    kotak(-2.0, 75, 25, 0.08,74.7,25.3);
+    glEnd();
+    glPopMatrix();
 
     glFlush();
     glutSwapBuffers();
 
 }
 
-void idle() {
-    if (!mouseDown) {
-        xrot += 0.3f;
-        yrot += 0.4f;
-    }
+void reshape(int w, int h)
+{
+	glViewport(0, 0, w, h);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
 
-    glutPostRedisplay();
+	gluPerspective(50, 16.0 / 9.0, 2, 10000);
+	glMatrixMode(GL_MODELVIEW);
+
 }
 
-void mouse(int button, int state, int x, int y) {
-    if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-        mouseDown = true;
-        xdiff = x - yrot;
-        ydiff = -y + xrot;
-    }
-    else
-        mouseDown = false;
+void timer(int)
+{
+	glutPostRedisplay();
+	glutWarpPointer(width / 2, height / 2);
+	glutTimerFunc(1000 / FPS, timer, 0);
 }
 
-void mouseMotion(int x, int y) {
-    if (mouseDown) {
-        yrot = x - xdiff;
-        xrot = y + ydiff;
+void passive_motion(int x, int y)
+{
+	int dev_x, dev_y;
+	dev_x = (width / 2) - x;
+	dev_y = (height / 2) - y;
 
-        glutPostRedisplay();
-    }
+	yaw += (float)dev_x / 20.0;
+	pitch += (float)dev_y / 20.0;
 }
+
+void camera()
+{
+
+	if (motion.Forward)
+	{
+		camX += cos((yaw + 90) * TO_RADIANS) * 2;
+		camZ -= sin((yaw + 90) * TO_RADIANS) * 2;
+	}
+	if (motion.Backward)
+	{
+		camX += cos((yaw + 90 + 180) * TO_RADIANS) * 2;
+		camZ -= sin((yaw + 90 + 180) * TO_RADIANS) * 2;
+	}
+	if (motion.Left)
+	{
+		camX += cos((yaw + 90 + 90) * TO_RADIANS) * 2;
+		camZ -= sin((yaw + 90 + 90) * TO_RADIANS) * 2;
+	}
+	if (motion.Right)
+	{
+		camX += cos((yaw + 90 - 90) * TO_RADIANS) * 2;
+		camZ -= sin((yaw + 90 - 90) * TO_RADIANS) * 2;
+	}
+	if (motion.Naik)
+	{
+		terbang -= 2.0;
+	}
+	if (motion.Turun)
+	{
+		terbang += 2.0;
+	}
+
+	if (pitch >= 70)
+		pitch = 70;
+	if (pitch <= -90)
+		pitch = -90;
+
+
+	glRotatef(-pitch, 1.0, 0.0, 0.0);
+	glRotatef(-yaw, 0.0, 1.0, 0.0);
+
+	glTranslatef(-camX, -terbang, -350 - camZ);
+	if (terbang < 25)
+		terbang = 24;
+}
+
 void keyboard(unsigned char key, int x, int y)
 {
-    switch (key)
-    {
-    case 'w':
-    case 'W':
-        zmov += 3.0;
-        break;
-    case 'd':
-    case 'D':
-        xmov += 3.0;
-        break;
-    case 's':
-    case 'S':
-        zmov -= 3.0;
-        break;
-    case 'a':
-    case 'A':
-        xmov -= 3.0;
-        break;
-    case '7':
-        ymov += 3.0;
-        break;
-    case '9':
-        ymov -= 3.0;
-        break;
-    case '2':
-        glRotatef(2.0, 1.0, 0.0, 0.0);
-        break;
-    case '8':
-        glRotatef(-2.0, 1.0, 0.0, 0.0);
-        break;
-    case '6':
-        glRotatef(2.0, 0.0, 1.0, 0.0);
-        break;
-    case '4':
-        glRotatef(-2.0, 0.0, 1.0, 0.0);
-        break;
-    case '1':
-        glRotatef(2.0, 0.0, 0.0, 1.0);
-        break;
-    case '3':
-        glRotatef(-2.0, 0.0, 0.0, 1.0);
-        break;
-    case '5':
-        if (is_depth)
-        {
-            is_depth = 0;
-            glDisable(GL_DEPTH_TEST);
-        }
-        else
-        {
-            is_depth = 1;
-            glEnable(GL_DEPTH_TEST);
-        }
-    }
-    tampil();
+	switch (key)
+	{
+	case 'W':
+	case 'w':
+		motion.Forward = true;
+		break;
+	case 'A':
+	case 'a':
+		motion.Left = true;
+		break;
+	case 'S':
+	case 's':
+		motion.Backward = true;
+		break;
+	case 'D':
+	case 'd':
+		motion.Right = true;
+		break;
+	case 'E':
+	case 'e':
+		motion.Naik = true;
+		break;
+	case 'Q':
+	case 'q':
+		motion.Turun = true;
+		break;
+	case '6':
+		x_geser += 0.5;
+		break;
+	case '4':
+		x_geser -= 0.5;
+		break;
+	case '8':
+		y_geser += 0.5;
+		break;
+	case '2':
+		y_geser -= 0.5;
+		break;
+	case '9':
+		z_geser -= 0.5;
+		break;
+	case '1':
+		z_geser += 0.5;
+		break;
+	case '!':
+		exit(1);
+	}
 }
 
-void ukuran(int lebar, int tinggi)
+void keyboard_up(unsigned char key, int x, int y)
 {
-    if (tinggi == 0) tinggi = 1;
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(80.0, lebar / tinggi, 10.0, 600.0);
-    glTranslatef(0.0, -5.0, -150.0);
-    glMatrixMode(GL_MODELVIEW);
+	switch (key)
+	{
+	case 'W':
+	case 'w':
+		motion.Forward = false;
+		break;
+	case 'A':
+	case 'a':
+		motion.Left = false;
+		break;
+	case 'S':
+	case 's':
+		motion.Backward = false;
+		break;
+	case 'D':
+	case 'd':
+		motion.Right = false;
+		break;
+	case 'E':
+	case 'e':
+		motion.Naik = false;
+		break;
+	case 'Q':
+	case 'q':
+		motion.Turun = false;
+		break;
+	}
 }
 
 int main(int argc, char** argv)
 {
     glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(800, 600);
     glutInitWindowPosition(250, 80);
     glutCreateWindow("Universitas Tokyo");
     init();
     glutDisplayFunc(tampil);
-    glutKeyboardFunc(keyboard);
-    glutMouseFunc(mouse);
-    glutMotionFunc(mouseMotion);
-
-    glutReshapeFunc(ukuran);
+	glutReshapeFunc(reshape);
+	glutPassiveMotionFunc(passive_motion);
+	glutTimerFunc(0, timer, 0);
+	glutKeyboardFunc(keyboard);
+	glutKeyboardUpFunc(keyboard_up);
     glutMainLoop();
     return 0;
 }
+
